@@ -1,0 +1,56 @@
+{
+  "name": "@bagros/mcp-research-router",
+  "version": "0.1.0",
+  "description": "Modular MCP server for multi-provider AI research aggregation",
+  "main": "dist/cli.js",
+  "type": "module",
+  "bin": {
+    "mcp-research-router": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "prepublishOnly": "npm run build",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "research",
+    "openai",
+    "gemini",
+    "perplexity",
+    "deepseek",
+    "aggregation"
+  ],
+  "author": "Mirosław Bagrowski (@BaGRoS)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BaGRoS/mcp-research-router.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BaGRoS/mcp-research-router/issues"
+  },
+  "homepage": "https://github.com/BaGRoS/mcp-research-router#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "bottleneck": "^2.19.5",
+    "p-limit": "^5.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.1"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}
