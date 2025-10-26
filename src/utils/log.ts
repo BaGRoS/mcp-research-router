@@ -5,7 +5,7 @@
  * Emits MCP notifications for important events.
  */
 
-import { writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
+import { appendFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { LogLevel, EventType, LogEntry, MCPNotification, Provider } from '../types.js';
 
