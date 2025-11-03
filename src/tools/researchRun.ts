@@ -13,9 +13,10 @@ import { synthesize, aggregateWithoutSynthesis } from '../synth/synthesize.js';
 import { withRateLimit } from '../utils/rateLimit.js';
 import { getEstimatedCost } from '../utils/cost.js';
 import { saveMarkdownReport, previewMarkdownReport } from '../utils/md.js';
-import { 
-  notifyProviderStarted, 
-  notifyProviderFinished, 
+import {
+  log,
+  notifyProviderStarted,
+  notifyProviderFinished,
   notifyProviderFailed,
   notifySynthesisStarted,
   notifySynthesisFinished,
@@ -123,6 +124,8 @@ export async function researchRun(
     questions,
     synthesis,
     synthModel = 'gpt-5-mini',
+    includeRawResults = false,
+    includeMetrics = false,
     return: outputFormat,
     timeoutMs: _timeoutMs = 60000,
     maxRetries: _maxRetries = 3
@@ -175,10 +178,23 @@ export async function researchRun(
         0.003 // Estimated synthesis cost
       );
     } catch (error) {
-      const errorMsg = (error as Error).message;
+      const errorObj = error as any;
+      const errorMsg = errorObj.message;
+
+      // Log detailed catch block error
+      log('error', 'synthesis_catch_block', 'Caught synthesis error in researchRun', {
+        error: errorMsg,
+        errorName: errorObj.name,
+        stack: errorObj.stack
+      });
+
       notifySynthesisFailed(synthModel, errorMsg);
-      
+
       // Fall back to aggregation without synthesis
+      log('warn', 'synthesis_fallback', 'Falling back to aggregation without synthesis', {
+        providersCount: providerResults.filter(r => !r.error).length
+      });
+
       synthesisResult = aggregateWithoutSynthesis(providerResults);
     }
   } else {
@@ -196,14 +212,28 @@ export async function researchRun(
 
     case 'markdown':
       return {
-        content: previewMarkdownReport(synthesisResult, questions),
+        content: previewMarkdownReport(
+          synthesisResult,
+          questions,
+          includeRawResults && synthesis,
+          includeMetrics
+        ),
         format: 'markdown'
       };
 
     case 'file':
-      const filepath = saveMarkdownReport(synthesisResult, questions);
+      const filepath = saveMarkdownReport(
+        synthesisResult,
+        questions,
+        includeMetrics
+      );
       const fileSize = Buffer.byteLength(
-        previewMarkdownReport(synthesisResult, questions),
+        previewMarkdownReport(
+          synthesisResult,
+          questions,
+          includeRawResults && synthesis,
+          includeMetrics
+        ),
         'utf8'
       );
       notifyFileSaved(filepath, fileSize);

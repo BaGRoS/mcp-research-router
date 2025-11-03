@@ -60,6 +60,18 @@
       "enum": ["gpt-5", "gpt-5-mini", "gpt-5-nano"],
       "default": "gpt-5-mini"
     },
+    "includeRawResults": {
+      "type": "boolean",
+      "title": "Include Raw Results",
+      "description": "Include raw provider responses in output (in addition to synthesis). Only applies when synthesis is enabled. Defaults to false to save tokens.",
+      "default": false
+    },
+    "includeMetrics": {
+      "type": "boolean",
+      "title": "Include Metrics",
+      "description": "Include cost estimates, latency, and query statistics in output. Defaults to false to save tokens.",
+      "default": false
+    },
     "return": {
       "type": "string",
       "title": "Output Format",

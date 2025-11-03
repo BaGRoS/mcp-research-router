@@ -61,6 +61,10 @@ export interface ResearchRunConfig {
   synthesis: boolean;
   /** Model to use for synthesis (default: gpt-5-mini) */
   synthModel?: string;
+  /** Include raw provider responses in output (in addition to synthesis). Only applies when synthesis is enabled. */
+  includeRawResults?: boolean;
+  /** Include cost estimates, latency, and query statistics in output. Defaults to false to save tokens. */
+  includeMetrics?: boolean;
   /** Output format */
   return: OutputFormat;
   /** Request timeout in milliseconds */

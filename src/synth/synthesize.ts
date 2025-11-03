@@ -1,22 +1,23 @@
 /**
  * Synthesis Module
- * 
+ *
  * Aggregates and synthesizes research results from multiple providers.
  * Performs deduplication, contradiction detection, and citation preservation.
  */
 
 import { httpPost } from '../utils/http.js';
 import { calculateTotalCost, calculateCostBreakdown } from '../utils/cost.js';
-import type { 
-  ProviderResult, 
-  SynthesisResult, 
-  MetricsSummary 
+import { log } from '../utils/log.js';
+import type {
+  ProviderResult,
+  SynthesisResult,
+  MetricsSummary
 } from '../types.js';
 
 /**
  * OpenAI API configuration for synthesis
  */
-const OPENAI_API_URL = 'https://api.openai.com/v1/responses';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const API_KEY = process.env.OPENAI_API_KEY;
 
 /**
@@ -25,24 +26,34 @@ const API_KEY = process.env.OPENAI_API_KEY;
 const DEFAULT_SYNTHESIS_MODEL = 'gpt-5-mini';
 
 /**
- * OpenAI Responses API request interface
+ * OpenAI Chat Completions API request interface
  */
 interface SynthesisRequest {
   model: string;
-  input: string;
-  temperature?: number;
-  max_output_tokens?: number;
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }>;
+  max_completion_tokens?: number;
+  // Note: GPT-5 models don't support custom temperature
 }
 
 /**
- * OpenAI Responses API response interface
+ * OpenAI Chat Completions API response interface
  */
 interface SynthesisResponse {
   id: string;
   object: string;
   created: number;
   model: string;
-  output_text: string;
+  choices: Array<{
+    index: number;
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason: string;
+  }>;
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;
@@ -190,13 +201,35 @@ export async function synthesize(
     // Build synthesis prompt
     const prompt = buildSynthesisPrompt(successfulResults);
 
-    // Call OpenAI Responses API
+    // Log synthesis attempt
+    log('info', 'synthesis_started', `Starting synthesis with model ${synthModel}`, {
+      promptLength: prompt.length,
+      resultsCount: successfulResults.length,
+      model: synthModel
+    });
+
+    // Call OpenAI Chat Completions API
     const requestBody: SynthesisRequest = {
       model: synthModel,
-      input: prompt,
-      temperature: 0.3,
-      max_output_tokens: 8000
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a research synthesizer. Your task is to combine, deduplicate, and analyze research results from multiple AI providers into a comprehensive, unified summary.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_completion_tokens: 8000
+      // Note: GPT-5 models don't support custom temperature - use default (1)
     };
+
+    log('debug', 'synthesis_request', 'Sending request to OpenAI Chat Completions API', {
+      url: OPENAI_API_URL,
+      model: synthModel,
+      requestBody: JSON.stringify(requestBody)
+    });
 
     const response = await httpPost<SynthesisResponse>(
       OPENAI_API_URL,
@@ -212,7 +245,12 @@ export async function synthesize(
     );
 
     const synthesisLatencyMs = Date.now() - startTime;
-    const synthesized = response.data.output_text || '';
+    const synthesized = response.data.choices?.[0]?.message?.content || '';
+
+    log('info', 'synthesis_success', 'Synthesis completed successfully', {
+      latencyMs: synthesisLatencyMs,
+      outputLength: synthesized.length
+    });
 
     // Calculate metrics
     const metrics = calculateMetrics(results, synthesisLatencyMs);
@@ -226,7 +264,21 @@ export async function synthesize(
     };
 
   } catch (error) {
-    throw new Error(`Synthesis failed: ${(error as Error).message}`);
+    const errorObj = error as any;
+
+    // Log detailed error information
+    log('error', 'synthesis_failed', 'Synthesis failed with error', {
+      error: errorObj.message,
+      errorName: errorObj.name,
+      status: errorObj.status,
+      url: errorObj.url,
+      attempts: errorObj.attempts,
+      totalTimeMs: errorObj.totalTimeMs,
+      responseData: errorObj.data ? JSON.stringify(errorObj.data) : 'no data',
+      originalError: errorObj.originalError?.message
+    });
+
+    throw new Error(`Synthesis failed: ${errorObj.message}`);
   }
 }
 

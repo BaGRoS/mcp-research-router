@@ -1,11 +1,11 @@
 /**
  * Logging Module
- * 
+ *
  * Provides structured JSONL logging to stderr and rotating log files.
  * Emits MCP notifications for important events.
  */
 
-import { appendFileSync, existsSync, mkdirSync } from 'fs';
+import { appendFileSync, existsSync, mkdirSync, statSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import type { LogLevel, EventType, LogEntry, MCPNotification, Provider } from '../types.js';
 
@@ -13,6 +13,16 @@ import type { LogLevel, EventType, LogEntry, MCPNotification, Provider } from '.
  * Log directory path
  */
 const LOG_DIR = join(process.cwd(), 'logs');
+
+/**
+ * Maximum log file size (1MB)
+ */
+const MAX_LOG_SIZE = 1 * 1024 * 1024; // 1MB in bytes
+
+/**
+ * Maximum number of log files to keep
+ */
+const MAX_LOG_FILES = 3;
 
 /**
  * Current log file path
@@ -29,12 +39,78 @@ function ensureLogDirectory(): void {
 }
 
 /**
- * Get current log file path (creates new file daily)
+ * Get current log file path with timestamp
  */
 function getCurrentLogFile(): string {
-  const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  const filename = `research-router-${date}.jsonl`;
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, -5);
+  const filename = `research-router-${timestamp}.jsonl`;
   return join(LOG_DIR, filename);
+}
+
+/**
+ * Get file size in bytes
+ */
+function getFileSize(filepath: string): number {
+  try {
+    if (existsSync(filepath)) {
+      const stats = statSync(filepath);
+      return stats.size;
+    }
+  } catch (error) {
+    // File doesn't exist or can't be accessed
+  }
+  return 0;
+}
+
+/**
+ * Rotate log files - keep only the most recent MAX_LOG_FILES
+ */
+function rotateLogFiles(): void {
+  try {
+    if (!existsSync(LOG_DIR)) {
+      return;
+    }
+
+    // Get all log files sorted by modification time (newest first)
+    const files = readdirSync(LOG_DIR)
+      .filter(f => f.startsWith('research-router-') && f.endsWith('.jsonl'))
+      .map(f => ({
+        name: f,
+        path: join(LOG_DIR, f),
+        mtime: statSync(join(LOG_DIR, f)).mtime.getTime()
+      }))
+      .sort((a, b) => b.mtime - a.mtime); // Sort newest first
+
+    // Delete files beyond MAX_LOG_FILES
+    if (files.length > MAX_LOG_FILES) {
+      const filesToDelete = files.slice(MAX_LOG_FILES);
+      for (const file of filesToDelete) {
+        try {
+          unlinkSync(file.path);
+          console.error(JSON.stringify({
+            level: 'info',
+            event: 'log_rotated',
+            message: `Deleted old log file: ${file.name}`,
+            timestamp: new Date().toISOString()
+          }));
+        } catch (err) {
+          console.error(JSON.stringify({
+            level: 'warn',
+            event: 'log_rotation_failed',
+            message: `Failed to delete log file: ${file.name}`,
+            timestamp: new Date().toISOString()
+          }));
+        }
+      }
+    }
+  } catch (error) {
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'log_rotation_error',
+      message: `Log rotation failed: ${(error as Error).message}`,
+      timestamp: new Date().toISOString()
+    }));
+  }
 }
 
 /**
@@ -43,7 +119,10 @@ function getCurrentLogFile(): string {
 export function initLogging(): void {
   ensureLogDirectory();
   currentLogFile = getCurrentLogFile();
-  
+
+  // Rotate old log files
+  rotateLogFiles();
+
   // Write startup log entry
   log('info', 'system_started', 'MCP Research Router started');
 }
@@ -73,7 +152,28 @@ export function log(
   // Write to log file
   try {
     ensureLogDirectory();
-    const logFile = currentLogFile || getCurrentLogFile();
+
+    // Check if current log file exceeds size limit
+    let logFile = currentLogFile || getCurrentLogFile();
+    const currentSize = getFileSize(logFile);
+
+    if (currentSize >= MAX_LOG_SIZE) {
+      // Create new log file
+      logFile = getCurrentLogFile();
+      currentLogFile = logFile;
+
+      // Rotate old files
+      rotateLogFiles();
+
+      // Log rotation event
+      console.error(JSON.stringify({
+        level: 'info',
+        event: 'log_file_rotated',
+        message: `Created new log file (previous exceeded ${MAX_LOG_SIZE} bytes)`,
+        timestamp: new Date().toISOString()
+      }));
+    }
+
     appendFileSync(logFile, line + '\n', 'utf-8');
   } catch (error) {
     // If file logging fails, only log to stderr
@@ -326,13 +426,4 @@ export function notifyFileSaved(
 ): MCPNotification {
   logFileSaved(filepath, sizeBytes);
   return createMCPNotification('file_saved');
-}
-
-/**
- * Rotate log files (cleanup old logs)
- * Keeps logs for last 30 days
- */
-export function rotateLogFiles(): void {
-  // TODO: Implement log rotation if needed
-  // For now, we create daily files which can be manually cleaned
 }

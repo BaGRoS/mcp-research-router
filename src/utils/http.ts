@@ -157,6 +157,8 @@ function enrichError(
   (enriched as any).url = url;
   (enriched as any).attempts = attempts;
   (enriched as any).totalTimeMs = totalTimeMs;
+  (enriched as any).status = (error as any).status;
+  (enriched as any).data = (error as any).data;
   return enriched;
 }
 

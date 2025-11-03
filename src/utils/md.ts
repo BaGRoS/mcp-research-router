@@ -224,7 +224,8 @@ function formatProviderDetails(sources: ProviderResult[]): string {
 export function generateMarkdownReport(
   synthesis: SynthesisResult,
   questions: ResearchQuery[],
-  includeProviderDetails = false
+  includeProviderDetails = false,
+  includeMetrics = false
 ): string {
   const sections = [
     generateFrontMatter(synthesis, questions),
@@ -232,9 +233,12 @@ export function generateMarkdownReport(
     '# Research Summary',
     '',
     synthesis.synthesized,
-    formatCitations(synthesis.sources),
-    formatMetrics(synthesis)
+    formatCitations(synthesis.sources)
   ];
+
+  if (includeMetrics) {
+    sections.push(formatMetrics(synthesis));
+  }
 
   if (includeProviderDetails) {
     sections.push(formatProviderDetails(synthesis.sources));
@@ -245,15 +249,17 @@ export function generateMarkdownReport(
 
 /**
  * Save synthesis result to Markdown file
- * 
+ *
  * @param synthesis Synthesis result to save
  * @param questions Original questions
+ * @param includeMetrics Include metrics section
  * @param filename Optional custom filename
  * @returns Filepath of saved report
  */
 export function saveMarkdownReport(
   synthesis: SynthesisResult,
   questions: ResearchQuery[],
+  includeMetrics = false,
   filename?: string
 ): string {
   ensureReportsDirectory();
@@ -263,7 +269,7 @@ export function saveMarkdownReport(
     filename || generateFilename()
   );
 
-  const content = generateMarkdownReport(synthesis, questions, true);
+  const content = generateMarkdownReport(synthesis, questions, true, includeMetrics);
 
   writeFileSync(filepath, content, 'utf-8');
 
@@ -282,7 +288,9 @@ export function getReportPath(filename: string): string {
  */
 export function previewMarkdownReport(
   synthesis: SynthesisResult,
-  questions: ResearchQuery[]
+  questions: ResearchQuery[],
+  includeProviderDetails = false,
+  includeMetrics = false
 ): string {
-  return generateMarkdownReport(synthesis, questions, false);
+  return generateMarkdownReport(synthesis, questions, includeProviderDetails, includeMetrics);
 }
