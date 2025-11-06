@@ -205,8 +205,25 @@ export async function researchRun(
   // Format output based on requested format
   switch (outputFormat) {
     case 'json':
+      // Build JSON output respecting includeRawResults and includeMetrics flags
+      const jsonOutput: any = {
+        synthesized: synthesisResult.synthesized,
+        timestamp: synthesisResult.timestamp,
+        synthModel: synthesisResult.synthModel
+      };
+
+      // Include raw provider results only if requested
+      if (includeRawResults && synthesis) {
+        jsonOutput.sources = synthesisResult.sources;
+      }
+
+      // Include metrics only if requested
+      if (includeMetrics) {
+        jsonOutput.metrics = synthesisResult.metrics;
+      }
+
       return {
-        content: JSON.stringify(synthesisResult, null, 2),
+        content: JSON.stringify(jsonOutput, null, 2),
         format: 'json'
       };
 
@@ -225,6 +242,7 @@ export async function researchRun(
       const filepath = saveMarkdownReport(
         synthesisResult,
         questions,
+        includeRawResults && synthesis,
         includeMetrics
       );
       const fileSize = Buffer.byteLength(
@@ -237,7 +255,7 @@ export async function researchRun(
         'utf8'
       );
       notifyFileSaved(filepath, fileSize);
-      
+
       return {
         content: `Report saved to: ${filepath}`,
         format: 'file',

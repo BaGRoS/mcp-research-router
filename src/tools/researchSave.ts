@@ -44,8 +44,9 @@ export function researchSave(filename?: string): { filepath: string } | { error:
   }
 
   try {
-    const filepath = saveMarkdownReport(lastSynthesis, lastQuestions, true, filename); // Include metrics in saved files
-    
+    // Save with provider details and metrics by default for manual saves
+    const filepath = saveMarkdownReport(lastSynthesis, lastQuestions, true, true, filename);
+
     // Calculate file size for logging
     const content = JSON.stringify(lastSynthesis);
     const fileSize = Buffer.byteLength(content, 'utf8');
