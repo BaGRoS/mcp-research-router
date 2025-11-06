@@ -78,7 +78,8 @@ function objectToYAML(obj: Record<string, any>, indent = 0): string {
  */
 function generateFrontMatter(
   synthesis: SynthesisResult,
-  questions: ResearchQuery[]
+  questions: ResearchQuery[],
+  includeMetrics = false
 ): string {
   // Extract unique provider/model combinations
   const providers = Array.from(
@@ -90,7 +91,7 @@ function generateFrontMatter(
     return { name: name as Provider, model };
   });
 
-  const frontMatter: ReportFrontMatter = {
+  const frontMatter: Partial<ReportFrontMatter> = {
     title: `Research Summary: ${questions[0]?.text.substring(0, 50) || 'Multi-Question Research'}`,
     date: synthesis.timestamp,
     providers,
@@ -99,14 +100,18 @@ function generateFrontMatter(
         id: q.id,
         text: q.text
       }))
-    },
-    metrics: {
-      totalLatencyMs: synthesis.metrics.totalLatencyMs,
-      costEstimateUSD: synthesis.metrics.costEstimates
     }
   };
 
-  return '---\n' + objectToYAML(frontMatter) + '\n---\n';
+  // Only include metrics if requested (to save tokens)
+  if (includeMetrics) {
+    frontMatter.metrics = {
+      totalLatencyMs: synthesis.metrics.totalLatencyMs,
+      costEstimateUSD: synthesis.metrics.costEstimates
+    };
+  }
+
+  return '---\n' + objectToYAML(frontMatter as ReportFrontMatter) + '\n---\n';
 }
 
 /**
@@ -228,7 +233,7 @@ export function generateMarkdownReport(
   includeMetrics = false
 ): string {
   const sections = [
-    generateFrontMatter(synthesis, questions),
+    generateFrontMatter(synthesis, questions, includeMetrics),
     '',
     '# Research Summary',
     '',
@@ -252,13 +257,15 @@ export function generateMarkdownReport(
  *
  * @param synthesis Synthesis result to save
  * @param questions Original questions
- * @param includeMetrics Include metrics section
+ * @param includeProviderDetails Include raw provider responses (defaults to false to save tokens)
+ * @param includeMetrics Include metrics section (defaults to false to save tokens)
  * @param filename Optional custom filename
  * @returns Filepath of saved report
  */
 export function saveMarkdownReport(
   synthesis: SynthesisResult,
   questions: ResearchQuery[],
+  includeProviderDetails = false,
   includeMetrics = false,
   filename?: string
 ): string {
@@ -269,7 +276,7 @@ export function saveMarkdownReport(
     filename || generateFilename()
   );
 
-  const content = generateMarkdownReport(synthesis, questions, true, includeMetrics);
+  const content = generateMarkdownReport(synthesis, questions, includeProviderDetails, includeMetrics);
 
   writeFileSync(filepath, content, 'utf-8');
 
