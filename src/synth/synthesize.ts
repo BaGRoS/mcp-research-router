@@ -221,7 +221,7 @@ export async function synthesize(
           content: prompt
         }
       ],
-      max_completion_tokens: 4000
+      max_completion_tokens: 8000
       // Note: GPT-5 models don't support custom temperature - use default (1)
     };
 
