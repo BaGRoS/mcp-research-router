@@ -81,30 +81,31 @@ function generateFrontMatter(
   questions: ResearchQuery[],
   includeMetrics = false
 ): string {
-  // Extract unique provider/model combinations
-  const providers = Array.from(
-    new Set(
-      synthesis.sources.map(s => `${s.provider}:${s.model}`)
-    )
-  ).map(combo => {
-    const [name, model] = combo.split(':');
-    return { name: name as Provider, model };
-  });
-
+  // Minimal front matter by default
   const frontMatter: Partial<ReportFrontMatter> = {
     title: `Research Summary: ${questions[0]?.text.substring(0, 50) || 'Multi-Question Research'}`,
-    date: synthesis.timestamp,
-    providers,
-    summary: {
+    date: synthesis.timestamp
+  };
+
+  // Only include providers and metrics if requested (to save tokens)
+  if (includeMetrics) {
+    // Extract unique provider/model combinations
+    const providers = Array.from(
+      new Set(
+        synthesis.sources.map(s => `${s.provider}:${s.model}`)
+      )
+    ).map(combo => {
+      const [name, model] = combo.split(':');
+      return { name: name as Provider, model };
+    });
+
+    frontMatter.providers = providers;
+    frontMatter.summary = {
       questions: questions.map(q => ({
         id: q.id,
         text: q.text
       }))
-    }
-  };
-
-  // Only include metrics if requested (to save tokens)
-  if (includeMetrics) {
+    };
     frontMatter.metrics = {
       totalLatencyMs: synthesis.metrics.totalLatencyMs,
       costEstimateUSD: synthesis.metrics.costEstimates
@@ -237,9 +238,13 @@ export function generateMarkdownReport(
     '',
     '# Research Summary',
     '',
-    synthesis.synthesized,
-    formatCitations(synthesis.sources)
+    synthesis.synthesized
   ];
+
+  // Only include citations if metrics are requested (to save tokens)
+  if (includeMetrics) {
+    sections.push(formatCitations(synthesis.sources));
+  }
 
   if (includeMetrics) {
     sections.push(formatMetrics(synthesis));
