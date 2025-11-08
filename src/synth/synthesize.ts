@@ -68,21 +68,21 @@ function buildSynthesisPrompt(results: ProviderResult[]): string {
   const sections: string[] = [
     '# Research Synthesis Task',
     '',
-    'You are a research synthesizer. Analyze the following results from multiple AI providers and create a comprehensive, unified summary.',
+    'You are a research synthesizer. Analyze the following results from multiple AI providers and create a concise, unified summary.',
     '',
     '## Your Tasks:',
-    '1. **Combine key findings** - Merge information from all sources into a coherent narrative',
-    '2. **Remove duplicates** - Eliminate redundant information across providers',
-    '3. **Highlight contradictions** - Explicitly note any conflicting information',
-    '4. **Preserve citations** - Keep all URLs and sources intact',
+    '1. **Combine key findings** - Merge information into a coherent narrative',
+    '2. **Remove duplicates** - Eliminate redundant information',
+    '3. **Highlight contradictions** - Note any conflicting information if critical',
+    '4. **Be concise** - Focus on essential information only',
     '5. **Maintain factual accuracy** - Do not add information not present in the sources',
     '',
     '## Format Requirements:',
-    '- Start with a brief executive summary',
+    '- Keep the output concise and focused',
     '- Organize content by topic/theme, not by provider',
     '- Use markdown formatting for readability',
-    '- Include a "Sources" section at the end with all citations',
-    '- If contradictions exist, create a "Discrepancies" section',
+    '- Avoid excessive citations and URLs in the main text',
+    '- If contradictions exist, briefly note them',
     '',
     '---',
     ''
@@ -214,14 +214,14 @@ export async function synthesize(
       messages: [
         {
           role: 'system',
-          content: 'You are a research synthesizer. Your task is to combine, deduplicate, and analyze research results from multiple AI providers into a comprehensive, unified summary.'
+          content: 'You are a research synthesizer. Combine and deduplicate research results into a concise, unified summary. Focus on essential information only.'
         },
         {
           role: 'user',
           content: prompt
         }
       ],
-      max_completion_tokens: 8000
+      max_completion_tokens: 4000
       // Note: GPT-5 models don't support custom temperature - use default (1)
     };
 
