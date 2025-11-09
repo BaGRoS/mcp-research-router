@@ -20,6 +20,13 @@ const DEBUG_DIR = join(process.cwd(), 'logs', 'debug');
 const MAX_DEBUG_FILES = 20;
 
 /**
+ * Content truncation limits for readability
+ */
+const TRUNCATE_PROVIDER_CONTENT = 2000;
+const TRUNCATE_SYNTHESIS_PROMPT = 1500;
+const TRUNCATE_SYNTHESIS_CONTENT = 3000;
+
+/**
  * Check if debug mode is enabled
  */
 let debugEnabled: boolean = false;
@@ -319,6 +326,23 @@ export function logProviderResponse(
   const statusEmoji = success ? '✅' : '❌';
   const statusText = success ? 'Success' : 'Failed';
 
+  // Build metadata items array for better readability
+  const metadataItems = [`- ⏱️ **Latency:** ${formatDuration(result.latencyMs)}`];
+
+  if (costUSD !== undefined) {
+    metadataItems.push(`- 💰 **Cost:** ${formatCost(costUSD)}`);
+  }
+
+  if (result.usage) {
+    metadataItems.push(
+      `- 📊 **Tokens:** input=${formatNumber(result.usage.promptTokens)}, output=${formatNumber(result.usage.completionTokens)}, total=${formatNumber(result.usage.totalTokens)}`
+    );
+  }
+
+  if (result.citations && result.citations.length > 0) {
+    metadataItems.push(`- 📚 **Citations:** ${result.citations.length} sources`);
+  }
+
   const content = `
 **Response Time:** ${formatTime(timestamp)}
 
@@ -326,7 +350,7 @@ export function logProviderResponse(
 
 ${success ? `**Response Content:**
 \`\`\`
-${result.content.substring(0, 2000)}${result.content.length > 2000 ? '\n... (truncated)' : ''}
+${result.content.substring(0, TRUNCATE_PROVIDER_CONTENT)}${result.content.length > TRUNCATE_PROVIDER_CONTENT ? '\n... (truncated)' : ''}
 \`\`\`
 ` : ''}
 
@@ -337,10 +361,9 @@ ${result.error}
 ` : ''}
 
 **Metadata:**
-- ⏱️ **Latency:** ${formatDuration(result.latencyMs)}
-${costUSD !== undefined ? `- 💰 **Cost:** ${formatCost(costUSD)}\n` : ''}${result.usage ? `- 📊 **Tokens:** input=${formatNumber(result.usage.promptTokens)}, output=${formatNumber(result.usage.completionTokens)}, total=${formatNumber(result.usage.totalTokens)}\n` : ''}${result.citations && result.citations.length > 0 ? `- 📚 **Citations:** ${result.citations.length} sources\n` : ''}
-${result.citations && result.citations.length > 0 ? `
-**Citations:**
+${metadataItems.join('\n')}
+
+${result.citations && result.citations.length > 0 ? `**Citations:**
 ${result.citations.map((c, i) => `${i + 1}. ${c.title}${c.url ? ` - ${c.url}` : ''}`).join('\n')}
 ` : ''}
 ---
@@ -374,7 +397,7 @@ export function logSynthesisRequest(
 
 ${synthesisPrompt ? `**Synthesis Prompt:**
 \`\`\`
-${synthesisPrompt.substring(0, 1500)}${synthesisPrompt.length > 1500 ? '\n... (truncated)' : ''}
+${synthesisPrompt.substring(0, TRUNCATE_SYNTHESIS_PROMPT)}${synthesisPrompt.length > TRUNCATE_SYNTHESIS_PROMPT ? '\n... (truncated)' : ''}
 \`\`\`
 ` : ''}
 `;
@@ -402,6 +425,19 @@ export function logSynthesisResponse(
   const statusEmoji = success ? '✅' : '❌';
   const statusText = success ? 'Success' : 'Failed';
 
+  // Build metadata items array for better readability
+  const metadataItems = [`- ⏱️ **Latency:** ${formatDuration(latencyMs)}`];
+
+  if (costUSD !== undefined) {
+    metadataItems.push(`- 💰 **Cost:** ${formatCost(costUSD)}`);
+  }
+
+  if (usage) {
+    metadataItems.push(
+      `- 📊 **Tokens:** input=${formatNumber(usage.promptTokens)}, output=${formatNumber(usage.completionTokens)}, total=${formatNumber(usage.totalTokens)}`
+    );
+  }
+
   const content = `
 **Synthesis Complete:** ${formatTime(timestamp)}
 **Model:** ${model}
@@ -410,7 +446,7 @@ export function logSynthesisResponse(
 
 ${success ? `**Synthesized Content:**
 \`\`\`markdown
-${synthesizedContent.substring(0, 3000)}${synthesizedContent.length > 3000 ? '\n... (truncated)' : ''}
+${synthesizedContent.substring(0, TRUNCATE_SYNTHESIS_CONTENT)}${synthesizedContent.length > TRUNCATE_SYNTHESIS_CONTENT ? '\n... (truncated)' : ''}
 \`\`\`
 ` : ''}
 
@@ -421,8 +457,7 @@ ${error}
 ` : ''}
 
 **Synthesis Metadata:**
-- ⏱️ **Latency:** ${formatDuration(latencyMs)}
-${costUSD !== undefined ? `- 💰 **Cost:** ${formatCost(costUSD)}\n` : ''}${usage ? `- 📊 **Tokens:** input=${formatNumber(usage.promptTokens)}, output=${formatNumber(usage.completionTokens)}, total=${formatNumber(usage.totalTokens)}\n` : ''}
+${metadataItems.join('\n')}
 ---
 
 `;

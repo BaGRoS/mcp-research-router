@@ -30,6 +30,12 @@ const API_KEY = process.env.OPENAI_API_KEY;
 const DEFAULT_SYNTHESIS_MODEL = 'gpt-5-mini';
 
 /**
+ * Cost per token for synthesis (gpt-5-mini)
+ * This is a rough estimate for debug logging purposes
+ */
+const SYNTHESIS_COST_PER_TOKEN = 0.000002;
+
+/**
  * OpenAI Chat Completions API request interface
  */
 interface SynthesisRequest {
@@ -266,8 +272,8 @@ export async function synthesize(
       totalTokens: response.data.usage.total_tokens
     } : undefined;
 
-    // Estimate synthesis cost (rough estimate: $0.000002 per token for gpt-5-mini)
-    const synthesisCostUSD = usage ? (usage.totalTokens * 0.000002) : undefined;
+    // Estimate synthesis cost for debug logging
+    const synthesisCostUSD = usage ? (usage.totalTokens * SYNTHESIS_COST_PER_TOKEN) : undefined;
 
     logSynthesisResponse(synthModel, synthesized, synthesisLatencyMs, synthesisCostUSD, usage);
 
