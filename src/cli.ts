@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 /**
  * MCP Research Router - CLI Entry Point
- * 
+ *
  * Starts the MCP server with STDIO transport.
  * This file is the executable entry point when running via npx.
  */
 
 import { startServer, stopServer } from './server.js';
+import { initDebugLogging, closeDebugLog } from './utils/debug.js';
 
 /**
  * Main entry point
  */
 async function main() {
   try {
+    // Initialize debug logging if DEBUG=1
+    initDebugLogging();
+
     // Start the MCP server
     await startServer();
 
@@ -24,7 +28,8 @@ async function main() {
         message: 'Received SIGINT, shutting down gracefully',
         timestamp: new Date().toISOString()
       }));
-      
+
+      closeDebugLog();
       await stopServer();
       process.exit(0);
     });
@@ -36,7 +41,8 @@ async function main() {
         message: 'Received SIGTERM, shutting down gracefully',
         timestamp: new Date().toISOString()
       }));
-      
+
+      closeDebugLog();
       await stopServer();
       process.exit(0);
     });

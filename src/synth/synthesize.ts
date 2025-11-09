@@ -8,6 +8,10 @@
 import { httpPost } from '../utils/http.js';
 import { calculateTotalCost, calculateCostBreakdown } from '../utils/cost.js';
 import { log } from '../utils/log.js';
+import {
+  logSynthesisRequest,
+  logSynthesisResponse
+} from '../utils/debug.js';
 import type {
   ProviderResult,
   SynthesisResult,
@@ -24,6 +28,12 @@ const API_KEY = process.env.OPENAI_API_KEY;
  * Default synthesis model
  */
 const DEFAULT_SYNTHESIS_MODEL = 'gpt-5-mini';
+
+/**
+ * Cost per token for synthesis (gpt-5-mini)
+ * This is a rough estimate for debug logging purposes
+ */
+const SYNTHESIS_COST_PER_TOKEN = 0.000002;
 
 /**
  * OpenAI Chat Completions API request interface
@@ -208,6 +218,9 @@ export async function synthesize(
       model: synthModel
     });
 
+    // Debug: Log synthesis request
+    logSynthesisRequest(synthModel, successfulResults.length, prompt);
+
     // Call OpenAI Chat Completions API
     const requestBody: SynthesisRequest = {
       model: synthModel,
@@ -252,6 +265,18 @@ export async function synthesize(
       outputLength: synthesized.length
     });
 
+    // Debug: Log synthesis response
+    const usage = response.data.usage ? {
+      promptTokens: response.data.usage.prompt_tokens,
+      completionTokens: response.data.usage.completion_tokens,
+      totalTokens: response.data.usage.total_tokens
+    } : undefined;
+
+    // Estimate synthesis cost for debug logging
+    const synthesisCostUSD = usage ? (usage.totalTokens * SYNTHESIS_COST_PER_TOKEN) : undefined;
+
+    logSynthesisResponse(synthModel, synthesized, synthesisLatencyMs, synthesisCostUSD, usage);
+
     // Calculate metrics
     const metrics = calculateMetrics(results, synthesisLatencyMs);
 
@@ -265,6 +290,7 @@ export async function synthesize(
 
   } catch (error) {
     const errorObj = error as any;
+    const errorLatencyMs = Date.now() - startTime;
 
     // Log detailed error information
     log('error', 'synthesis_failed', 'Synthesis failed with error', {
@@ -277,6 +303,9 @@ export async function synthesize(
       responseData: errorObj.data ? JSON.stringify(errorObj.data) : 'no data',
       originalError: errorObj.originalError?.message
     });
+
+    // Debug: Log synthesis error
+    logSynthesisResponse(synthModel, '', errorLatencyMs, undefined, undefined, errorObj.message);
 
     throw new Error(`Synthesis failed: ${errorObj.message}`);
   }

@@ -23,6 +23,10 @@ import {
   notifySynthesisFailed,
   notifyFileSaved
 } from '../utils/log.js';
+import {
+  logProviderRequest,
+  logProviderResponse
+} from '../utils/debug.js';
 import type { 
   Provider, 
   ProviderAdapter, 
@@ -73,9 +77,12 @@ async function executeProviderQuery(
   }
 
   const selectedModel = model || adapter.getDefaultModel();
-  
+
   // Notify start
   notifyProviderStarted(provider, selectedModel, question.id);
+
+  // Debug: Log request
+  logProviderRequest(provider, selectedModel, question.id, question.text);
 
   try {
     // Execute with rate limiting
@@ -84,20 +91,23 @@ async function executeProviderQuery(
     });
 
     // Notify completion
+    const cost = getEstimatedCost(provider, selectedModel);
     if (!result.error) {
-      const cost = getEstimatedCost(provider, selectedModel);
       notifyProviderFinished(provider, selectedModel, question.id, result.latencyMs, cost);
     } else {
       notifyProviderFailed(provider, question.id, result.error);
     }
+
+    // Debug: Log response
+    logProviderResponse(provider, selectedModel, question.id, result, cost);
 
     return result;
 
   } catch (error) {
     const errorMsg = (error as Error).message;
     notifyProviderFailed(provider, question.id, errorMsg);
-    
-    return {
+
+    const errorResult: ProviderResult = {
       provider,
       model: selectedModel,
       questionId: question.id,
@@ -106,6 +116,11 @@ async function executeProviderQuery(
       timestamp: new Date().toISOString(),
       error: errorMsg
     };
+
+    // Debug: Log error response
+    logProviderResponse(provider, selectedModel, question.id, errorResult);
+
+    return errorResult;
   }
 }
 
