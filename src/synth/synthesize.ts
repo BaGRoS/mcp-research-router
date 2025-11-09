@@ -8,6 +8,10 @@
 import { httpPost } from '../utils/http.js';
 import { calculateTotalCost, calculateCostBreakdown } from '../utils/cost.js';
 import { log } from '../utils/log.js';
+import {
+  logSynthesisRequest,
+  logSynthesisResponse
+} from '../utils/debug.js';
 import type {
   ProviderResult,
   SynthesisResult,
@@ -208,6 +212,9 @@ export async function synthesize(
       model: synthModel
     });
 
+    // Debug: Log synthesis request
+    logSynthesisRequest(synthModel, successfulResults.length, prompt);
+
     // Call OpenAI Chat Completions API
     const requestBody: SynthesisRequest = {
       model: synthModel,
@@ -252,6 +259,18 @@ export async function synthesize(
       outputLength: synthesized.length
     });
 
+    // Debug: Log synthesis response
+    const usage = response.data.usage ? {
+      promptTokens: response.data.usage.prompt_tokens,
+      completionTokens: response.data.usage.completion_tokens,
+      totalTokens: response.data.usage.total_tokens
+    } : undefined;
+
+    // Estimate synthesis cost (rough estimate: $0.000002 per token for gpt-5-mini)
+    const synthesisCostUSD = usage ? (usage.totalTokens * 0.000002) : undefined;
+
+    logSynthesisResponse(synthModel, synthesized, synthesisLatencyMs, synthesisCostUSD, usage);
+
     // Calculate metrics
     const metrics = calculateMetrics(results, synthesisLatencyMs);
 
@@ -265,6 +284,7 @@ export async function synthesize(
 
   } catch (error) {
     const errorObj = error as any;
+    const errorLatencyMs = Date.now() - startTime;
 
     // Log detailed error information
     log('error', 'synthesis_failed', 'Synthesis failed with error', {
@@ -277,6 +297,9 @@ export async function synthesize(
       responseData: errorObj.data ? JSON.stringify(errorObj.data) : 'no data',
       originalError: errorObj.originalError?.message
     });
+
+    // Debug: Log synthesis error
+    logSynthesisResponse(synthModel, '', errorLatencyMs, undefined, undefined, errorObj.message);
 
     throw new Error(`Synthesis failed: ${errorObj.message}`);
   }

@@ -22,7 +22,7 @@ const MAX_LOG_SIZE = 1 * 1024 * 1024; // 1MB in bytes
 /**
  * Maximum number of log files to keep
  */
-const MAX_LOG_FILES = 3;
+const MAX_LOG_FILES = 10;
 
 /**
  * Current log file path

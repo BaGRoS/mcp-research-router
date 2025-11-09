@@ -74,7 +74,8 @@ src/
 │   ├── cost.ts           # Cost estimation per provider
 │   ├── md.ts             # Markdown report generation with YAML frontmatter
 │   ├── rateLimit.ts      # Rate limiting (Bottleneck)
-│   └── log.ts            # Structured JSONL logging
+│   ├── log.ts            # Structured JSONL logging
+│   └── debug.ts          # Debug mode with detailed Markdown logs
 └── schema/               # JSON Schema definitions for tools
 ```
 
@@ -113,12 +114,22 @@ This is exposed via `research.status` tool.
 
 ### Logging and Notifications
 src/utils/log.ts implements structured JSONL logging to logs/ directory with:
-- Rotation by date
+- Rotation by date (max 10 log files)
 - Event types (provider_started, provider_finished, synthesis_started, etc.)
 - All logs written to stderr to avoid interfering with STDIO MCP transport
 
+### Debug Mode
+src/utils/debug.ts provides detailed debugging capabilities when `DEBUG=1`:
+- Creates human-readable Markdown debug logs in `logs/debug/`
+- Captures full request/response details for all providers
+- Logs synthesis prompts and responses
+- Includes timing, costs, and token usage statistics
+- Generates session summary with per-provider metrics
+- Automatic rotation (keeps last 20 debug sessions)
+
 ## Environment Variables
 
+### Required API Keys
 Required for each provider you want to use:
 ```
 OPENAI_API_KEY       # OpenAI API key
@@ -128,6 +139,46 @@ DEEPSEEK_API_KEY     # DeepSeek API key
 ```
 
 Providers without configured API keys are skipped with appropriate error messages.
+
+### Debug Mode (Optional)
+Enable detailed debug logging:
+```
+DEBUG=1              # Enable debug mode
+MCP_DEBUG=1          # Alternative debug flag
+```
+
+When enabled, creates detailed Markdown debug logs in `logs/debug/` directory containing:
+- Full provider requests and responses
+- Question text and timestamps
+- Response content (truncated for readability)
+- Token usage and cost estimates
+- Synthesis prompts and results
+- Per-provider and session-wide statistics
+
+Debug logs are human-readable and ideal for:
+- Troubleshooting provider issues
+- Analyzing cost and latency patterns
+- Reviewing synthesis quality
+- Understanding system behavior
+
+**Example: Enabling debug mode in Claude Desktop config:**
+```json
+{
+  "mcpServers": {
+    "research-router": {
+      "command": "npx",
+      "args": ["-y", "@bagros/mcp-research-router"],
+      "env": {
+        "DEBUG": "1",
+        "OPENAI_API_KEY": "sk-...",
+        "GOOGLE_API_KEY": "...",
+        "PERPLEXITY_API_KEY": "...",
+        "DEEPSEEK_API_KEY": "..."
+      }
+    }
+  }
+}
+```
 
 ## MCP Tools
 
