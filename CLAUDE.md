@@ -113,19 +113,37 @@ Global `lastRunStatus` variable (src/tools/researchRun.ts:50) tracks per-provide
 This is exposed via `research.status` tool.
 
 ### Logging and Notifications
-src/utils/log.ts implements structured JSONL logging to logs/ directory with:
-- Rotation by date (max 10 log files)
-- Event types (provider_started, provider_finished, synthesis_started, etc.)
-- All logs written to stderr to avoid interfering with STDIO MCP transport
+src/utils/log.ts implements a dual-format logging system with organized directory structure:
+
+**Directory Structure:**
+```
+logs/
+├── jsonl/           # Machine-readable JSONL logs (for parsing/monitoring)
+│   └── YYYY-MM-DD/  # Organized by date
+│       └── session-HH-MM-SS.jsonl
+├── sessions/        # Human-readable session logs (always enabled)
+│   └── YYYY-MM-DD/  # Organized by date
+│       └── session-HH-MM-SS.md
+└── debug/           # Detailed debug logs (only when DEBUG=1)
+    └── debug-session-TIMESTAMP.md
+```
+
+**Features:**
+- **JSONL Logs**: Machine-readable JSON Lines format for automated parsing and monitoring
+- **Session Logs**: Human-readable Markdown format with emojis, formatted timestamps, and organized metadata
+- **Automatic Rotation**: Keeps last 30 days of logs per type
+- **Event Types**: provider_started, provider_finished, synthesis_started, synthesis_finished, etc.
+- **All logs written to stderr** to avoid interfering with STDIO MCP transport
 
 ### Debug Mode
 src/utils/debug.ts provides detailed debugging capabilities when `DEBUG=1`:
-- Creates human-readable Markdown debug logs in `logs/debug/`
+- Creates comprehensive Markdown debug logs in `logs/debug/`
 - Captures full request/response details for all providers
-- Logs synthesis prompts and responses
+- Logs synthesis prompts and responses (with truncation for readability)
 - Includes timing, costs, and token usage statistics
 - Generates session summary with per-provider metrics
 - Automatic rotation (keeps last 20 debug sessions)
+- Custom log directory via `DEBUG_LOG_DIR` environment variable
 
 ## Environment Variables
 

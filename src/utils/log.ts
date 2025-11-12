@@ -1,18 +1,21 @@
 /**
  * Logging Module
  *
- * Provides structured JSONL logging to stderr and rotating log files.
+ * Provides structured logging with both machine-readable (JSONL) and human-readable (Markdown) formats.
+ * Organizes logs into directories by date and type for better organization.
  * Emits MCP notifications for important events.
  */
 
-import { appendFileSync, existsSync, mkdirSync, statSync, readdirSync, unlinkSync } from 'fs';
+import { appendFileSync, existsSync, mkdirSync, statSync, readdirSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { LogLevel, EventType, LogEntry, MCPNotification, Provider } from '../types.js';
 
 /**
- * Log directory path
+ * Log directory structure
  */
-const LOG_DIR = join(process.cwd(), 'logs');
+const BASE_LOG_DIR = join(process.cwd(), 'logs');
+const JSONL_LOG_DIR = join(BASE_LOG_DIR, 'jsonl');  // Machine-readable JSONL logs
+const SESSION_LOG_DIR = join(BASE_LOG_DIR, 'sessions');  // Human-readable session logs
 
 /**
  * Maximum log file size (1MB)
@@ -20,31 +23,61 @@ const LOG_DIR = join(process.cwd(), 'logs');
 const MAX_LOG_SIZE = 1 * 1024 * 1024; // 1MB in bytes
 
 /**
- * Maximum number of log files to keep
+ * Maximum number of log directories to keep per type
  */
-const MAX_LOG_FILES = 10;
+const MAX_LOG_DIRS = 30; // Keep 30 days of logs
 
 /**
- * Current log file path
+ * Current log files
  */
-let currentLogFile: string | null = null;
+let currentJsonlFile: string | null = null;
+let currentSessionFile: string | null = null;
+let sessionStartTime: Date | null = null;
 
 /**
- * Ensure log directory exists
+ * Ensure log directories exist
  */
-function ensureLogDirectory(): void {
-  if (!existsSync(LOG_DIR)) {
-    mkdirSync(LOG_DIR, { recursive: true });
-  }
+function ensureLogDirectories(): void {
+  [BASE_LOG_DIR, JSONL_LOG_DIR, SESSION_LOG_DIR].forEach(dir => {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+  });
 }
 
 /**
- * Get current log file path with timestamp
+ * Get directory path for today's logs
  */
-function getCurrentLogFile(): string {
+function getTodayLogDir(baseDir: string): string {
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+  const dir = join(baseDir, dateStr);
+
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+
+  return dir;
+}
+
+/**
+ * Get current JSONL log file path with timestamp
+ */
+function getCurrentJsonlFile(): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, -5);
-  const filename = `research-router-${timestamp}.jsonl`;
-  return join(LOG_DIR, filename);
+  const filename = `session-${timestamp}.jsonl`;
+  const dir = getTodayLogDir(JSONL_LOG_DIR);
+  return join(dir, filename);
+}
+
+/**
+ * Get current session log file path with timestamp
+ */
+function getCurrentSessionFile(): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, -5);
+  const filename = `session-${timestamp}.md`;
+  const dir = getTodayLogDir(SESSION_LOG_DIR);
+  return join(dir, filename);
 }
 
 /**
@@ -63,41 +96,50 @@ function getFileSize(filepath: string): number {
 }
 
 /**
- * Rotate log files - keep only the most recent MAX_LOG_FILES
+ * Rotate log directories - keep only the most recent MAX_LOG_DIRS
  */
-function rotateLogFiles(): void {
+function rotateLogDirectories(baseDir: string): void {
   try {
-    if (!existsSync(LOG_DIR)) {
+    if (!existsSync(baseDir)) {
       return;
     }
 
-    // Get all log files sorted by modification time (newest first)
-    const files = readdirSync(LOG_DIR)
-      .filter(f => f.startsWith('research-router-') && f.endsWith('.jsonl'))
+    // Get all date directories sorted by name (which is YYYY-MM-DD, so sorts chronologically)
+    const dirs = readdirSync(baseDir)
+      .filter(f => {
+        const fullPath = join(baseDir, f);
+        return statSync(fullPath).isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(f);
+      })
       .map(f => ({
         name: f,
-        path: join(LOG_DIR, f),
-        mtime: statSync(join(LOG_DIR, f)).mtime.getTime()
+        path: join(baseDir, f)
       }))
-      .sort((a, b) => b.mtime - a.mtime); // Sort newest first
+      .sort((a, b) => b.name.localeCompare(a.name)); // Sort newest first
 
-    // Delete files beyond MAX_LOG_FILES
-    if (files.length > MAX_LOG_FILES) {
-      const filesToDelete = files.slice(MAX_LOG_FILES);
-      for (const file of filesToDelete) {
+    // Delete directories beyond MAX_LOG_DIRS
+    if (dirs.length > MAX_LOG_DIRS) {
+      const dirsToDelete = dirs.slice(MAX_LOG_DIRS);
+      for (const dir of dirsToDelete) {
         try {
-          unlinkSync(file.path);
+          // Delete all files in the directory first
+          const files = readdirSync(dir.path);
+          for (const file of files) {
+            unlinkSync(join(dir.path, file));
+          }
+          // Then delete the directory
+          unlinkSync(dir.path);
+
           console.error(JSON.stringify({
             level: 'info',
             event: 'log_rotated',
-            message: `Deleted old log file: ${file.name}`,
+            message: `Deleted old log directory: ${dir.name}`,
             timestamp: new Date().toISOString()
           }));
         } catch (err) {
           console.error(JSON.stringify({
             level: 'warn',
             event: 'log_rotation_failed',
-            message: `Failed to delete log file: ${file.name}`,
+            message: `Failed to delete log directory: ${dir.name}`,
             timestamp: new Date().toISOString()
           }));
         }
@@ -114,21 +156,123 @@ function rotateLogFiles(): void {
 }
 
 /**
+ * Format helpers for human-readable logs
+ */
+function formatTime(date: Date): string {
+  return date.toISOString();
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${ms.toFixed(0)}ms`;
+  }
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
+function formatCost(usd: number): string {
+  return `$${usd.toFixed(4)}`;
+}
+
+/**
  * Initialize logging system
  */
 export function initLogging(): void {
-  ensureLogDirectory();
-  currentLogFile = getCurrentLogFile();
+  ensureLogDirectories();
 
-  // Rotate old log files
-  rotateLogFiles();
+  currentJsonlFile = getCurrentJsonlFile();
+  currentSessionFile = getCurrentSessionFile();
+  sessionStartTime = new Date();
+
+  // Rotate old log directories
+  rotateLogDirectories(JSONL_LOG_DIR);
+  rotateLogDirectories(SESSION_LOG_DIR);
+
+  // Write session header to Markdown log
+  if (currentSessionFile) {
+    const header = `# 📊 MCP Research Router - Session Log
+
+**Session Start:** ${formatTime(sessionStartTime)}
+**Session ID:** ${sessionStartTime.getTime()}
+**Process ID:** ${process.pid}
+**Working Directory:** ${process.cwd()}
+
+---
+
+## Session Events
+
+`;
+
+    try {
+      writeFileSync(currentSessionFile, header, 'utf-8');
+    } catch (error) {
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'session_log_init_failed',
+        message: `Failed to initialize session log: ${(error as Error).message}`,
+        timestamp: new Date().toISOString()
+      }));
+    }
+  }
 
   // Write startup log entry
   log('info', 'system_started', 'MCP Research Router started');
 }
 
 /**
- * Write log entry to both stderr and file
+ * Write human-readable entry to session log
+ */
+function writeSessionLog(entry: LogEntry): void {
+  if (!currentSessionFile) {
+    return;
+  }
+
+  try {
+    const timestamp = new Date(entry.timestamp);
+    const timeStr = timestamp.toLocaleTimeString('en-US', { hour12: false });
+
+    // Determine emoji based on level and event
+    let emoji = '📝';
+    if (entry.level === 'error') emoji = '❌';
+    else if (entry.level === 'warn') emoji = '⚠️';
+    else if (entry.event === 'provider_started') emoji = '🚀';
+    else if (entry.event === 'provider_finished') emoji = '✅';
+    else if (entry.event === 'provider_failed') emoji = '❌';
+    else if (entry.event === 'synthesis_started') emoji = '🔄';
+    else if (entry.event === 'synthesis_finished') emoji = '✨';
+    else if (entry.event === 'file_saved') emoji = '💾';
+
+    let sessionEntry = `### ${emoji} [${timeStr}] ${entry.message}\n\n`;
+
+    // Add formatted metadata if present
+    if (entry.metadata) {
+      const meta = entry.metadata;
+      const items: string[] = [];
+
+      if (meta.provider) items.push(`**Provider:** ${meta.provider}`);
+      if (meta.model) items.push(`**Model:** ${meta.model}`);
+      if (meta.questionId) items.push(`**Question:** ${meta.questionId}`);
+      if (meta.latencyMs !== undefined) items.push(`**Latency:** ${formatDuration(meta.latencyMs as number)}`);
+      if (meta.costUSD !== undefined) items.push(`**Cost:** ${formatCost(meta.costUSD as number)}`);
+      if (meta.sourceCount !== undefined) items.push(`**Sources:** ${meta.sourceCount}`);
+      if (meta.filepath) items.push(`**File:** ${meta.filepath}`);
+      if (meta.sizeBytes !== undefined) items.push(`**Size:** ${(meta.sizeBytes as number / 1024).toFixed(2)} KB`);
+      if (meta.error) items.push(`**Error:** \`${meta.error}\``);
+
+      if (items.length > 0) {
+        sessionEntry += items.join(' • ') + '\n\n';
+      }
+    }
+
+    sessionEntry += '---\n\n';
+
+    appendFileSync(currentSessionFile, sessionEntry, 'utf-8');
+  } catch (error) {
+    // Silent fail for session log (we still have JSONL)
+  }
+}
+
+/**
+ * Write log entry to stderr, JSONL file, and human-readable session log
  */
 export function log(
   level: LogLevel,
@@ -149,21 +293,21 @@ export function log(
   // Write to stderr (visible in MCP clients)
   console.error(line);
 
-  // Write to log file
+  // Write to JSONL log file
   try {
-    ensureLogDirectory();
+    ensureLogDirectories();
 
     // Check if current log file exceeds size limit
-    let logFile = currentLogFile || getCurrentLogFile();
-    const currentSize = getFileSize(logFile);
+    let jsonlFile = currentJsonlFile || getCurrentJsonlFile();
+    const currentSize = getFileSize(jsonlFile);
 
     if (currentSize >= MAX_LOG_SIZE) {
       // Create new log file
-      logFile = getCurrentLogFile();
-      currentLogFile = logFile;
+      jsonlFile = getCurrentJsonlFile();
+      currentJsonlFile = jsonlFile;
 
-      // Rotate old files
-      rotateLogFiles();
+      // Rotate old directories
+      rotateLogDirectories(JSONL_LOG_DIR);
 
       // Log rotation event
       console.error(JSON.stringify({
@@ -174,7 +318,10 @@ export function log(
       }));
     }
 
-    appendFileSync(logFile, line + '\n', 'utf-8');
+    appendFileSync(jsonlFile, line + '\n', 'utf-8');
+
+    // Also write to human-readable session log
+    writeSessionLog(entry);
   } catch (error) {
     // If file logging fails, only log to stderr
     console.error(JSON.stringify({
@@ -183,6 +330,38 @@ export function log(
       message: `Failed to write to log file: ${(error as Error).message}`,
       timestamp: new Date().toISOString()
     }));
+  }
+}
+
+/**
+ * Close session log and write summary
+ */
+export function closeSessionLog(): void {
+  if (!currentSessionFile || !sessionStartTime) {
+    return;
+  }
+
+  try {
+    const endTime = new Date();
+    const duration = endTime.getTime() - sessionStartTime.getTime();
+
+    const footer = `
+---
+
+## Session Summary
+
+**Session End:** ${formatTime(endTime)}
+**Duration:** ${formatDuration(duration)}
+**Total Events:** Logged throughout session
+
+---
+
+*Session log closed successfully*
+`;
+
+    appendFileSync(currentSessionFile, footer, 'utf-8');
+  } catch (error) {
+    // Silent fail
   }
 }
 
