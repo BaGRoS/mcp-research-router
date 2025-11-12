@@ -145,9 +145,10 @@ Enable detailed debug logging:
 ```
 DEBUG=1              # Enable debug mode
 MCP_DEBUG=1          # Alternative debug flag
+DEBUG_LOG_DIR=/path  # Custom log directory (optional, defaults to current working directory)
 ```
 
-When enabled, creates detailed Markdown debug logs in `logs/debug/` directory containing:
+When enabled, creates detailed Markdown debug logs in `logs/debug/` directory (or `DEBUG_LOG_DIR/debug/` if custom path is set) containing:
 - Full provider requests and responses
 - Question text and timestamps
 - Response content (truncated for readability)
@@ -170,6 +171,7 @@ Debug logs are human-readable and ideal for:
       "args": ["-y", "@bagros/mcp-research-router"],
       "env": {
         "DEBUG": "1",
+        "DEBUG_LOG_DIR": "/Users/yourname/Projects/your-project",
         "OPENAI_API_KEY": "sk-...",
         "GOOGLE_API_KEY": "...",
         "PERPLEXITY_API_KEY": "...",
@@ -179,6 +181,8 @@ Debug logs are human-readable and ideal for:
   }
 }
 ```
+
+**Important:** Set `DEBUG_LOG_DIR` to the directory where you want debug logs saved. The system will create a `debug/` subdirectory there. If not set, logs will be saved in the current working directory (which may be the npm package installation directory when using npx).
 
 ## MCP Tools
 

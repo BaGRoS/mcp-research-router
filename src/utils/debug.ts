@@ -11,8 +11,17 @@ import type { Provider, ProviderResult, TokenUsage } from '../types.js';
 
 /**
  * Debug log directory path
+ * Can be customized via DEBUG_LOG_DIR environment variable
  */
-const DEBUG_DIR = join(process.cwd(), 'logs', 'debug');
+function getDebugDirectory(): string {
+  const customDir = process.env.DEBUG_LOG_DIR;
+  if (customDir) {
+    return join(customDir, 'debug');
+  }
+  return join(process.cwd(), 'logs', 'debug');
+}
+
+const DEBUG_DIR = getDebugDirectory();
 
 /**
  * Maximum number of debug files to keep
@@ -151,34 +160,60 @@ export function initDebugLogging(): void {
   debugEnabled = process.env.DEBUG === '1' || process.env.MCP_DEBUG === '1';
 
   if (!debugEnabled) {
+    // Log that debug mode is not enabled (helpful for troubleshooting)
+    console.error(JSON.stringify({
+      level: 'info',
+      event: 'debug_mode_disabled',
+      message: 'Debug mode is disabled. Set DEBUG=1 or MCP_DEBUG=1 to enable.',
+      timestamp: new Date().toISOString()
+    }));
     return;
   }
 
-  ensureDebugDirectory();
-  rotateDebugFiles();
+  try {
+    ensureDebugDirectory();
+    rotateDebugFiles();
 
-  currentDebugFile = getDebugFilePath();
-  sessionStartTime = new Date();
+    currentDebugFile = getDebugFilePath();
+    sessionStartTime = new Date();
 
-  // Write header
-  const header = `# 🔍 MCP Research Router - Debug Log
+    // Write header
+    const header = `# 🔍 MCP Research Router - Debug Log
 
 **Session Start:** ${sessionStartTime.toISOString()}
 **Debug Mode:** Enabled
 **PID:** ${process.pid}
+**Log Directory:** ${DEBUG_DIR}
+**Log File:** ${currentDebugFile}
+**Current Working Directory:** ${process.cwd()}
 
 ---
 
 `;
 
-  appendFileSync(currentDebugFile, header, 'utf-8');
+    appendFileSync(currentDebugFile, header, 'utf-8');
 
-  console.error(JSON.stringify({
-    level: 'info',
-    event: 'debug_mode_enabled',
-    message: `Debug logging enabled: ${currentDebugFile}`,
-    timestamp: new Date().toISOString()
-  }));
+    console.error(JSON.stringify({
+      level: 'info',
+      event: 'debug_mode_enabled',
+      message: `Debug logging enabled`,
+      debugDirectory: DEBUG_DIR,
+      debugFile: currentDebugFile,
+      cwd: process.cwd(),
+      timestamp: new Date().toISOString()
+    }));
+  } catch (error) {
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'debug_init_failed',
+      message: `Failed to initialize debug logging: ${(error as Error).message}`,
+      debugDirectory: DEBUG_DIR,
+      error: (error as Error).stack,
+      timestamp: new Date().toISOString()
+    }));
+    // Disable debug mode if initialization fails
+    debugEnabled = false;
+  }
 }
 
 /**
