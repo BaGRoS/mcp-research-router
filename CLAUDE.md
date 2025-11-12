@@ -113,7 +113,7 @@ Global `lastRunStatus` variable (src/tools/researchRun.ts:50) tracks per-provide
 This is exposed via `research.status` tool.
 
 ### Logging and Notifications
-src/utils/log.ts implements a dual-format logging system with organized directory structure:
+src/utils/log.ts implements a dual-format logging system with organized directory structure and **detailed request/response logging** (always enabled):
 
 **Directory Structure:**
 ```
@@ -121,19 +121,60 @@ logs/
 ├── jsonl/           # Machine-readable JSONL logs (for parsing/monitoring)
 │   └── YYYY-MM-DD/  # Organized by date
 │       └── session-HH-MM-SS.jsonl
-├── sessions/        # Human-readable session logs (always enabled)
+├── sessions/        # Human-readable session logs (DETAILED - always enabled)
 │   └── YYYY-MM-DD/  # Organized by date
 │       └── session-HH-MM-SS.md
-└── debug/           # Detailed debug logs (only when DEBUG=1)
+└── debug/           # Extra debug logs (only when DEBUG=1)
     └── debug-session-TIMESTAMP.md
 ```
 
-**Features:**
+**Session Logs (Always Enabled) Include:**
+- ✅ **Full Questions**: Complete question text sent to each LLM
+- ✅ **Full Responses**: Complete answer content from each LLM (up to 5000 chars, then truncated with indicator)
+- ✅ **Full Error Messages**: Complete error details when queries fail
+- ✅ **Citations**: All sources with titles, URLs, and snippet previews
+- ✅ **Token Usage**: Detailed breakdown (input/output/total) for each query
+- ✅ **Cost Tracking**: Estimated cost per query in USD
+- ✅ **Latency**: Response time for each provider
+- ✅ **Provider & Model**: Clear identification of which LLM was used
+- ✅ **Markdown Format**: Human-readable with emojis (🚀 start, ✅ success, ❌ error, 🔄 synthesis, ✨ complete)
+
+**Example Session Log Entry:**
+```markdown
+### 🚀 [19:33:01] OPENAI - Query Started
+**Provider:** openai
+**Model:** `gpt-5-mini`
+**Question ID:** q1
+
+**Question:**
+\```
+What are the latest developments in AI safety?
+\```
+---
+
+### ✅ [19:33:03] OPENAI - Query SUCCESS
+**Provider:** openai
+**Model:** `gpt-5-mini`
+**Latency:** 1.85s
+**Cost:** $0.0015
+**Tokens:** input=42, output=523, total=565
+
+**Response:**
+\```
+(Complete response text here - full answer from the LLM)
+\```
+
+**Citations:** (3 sources)
+1. **AI Safety Research** - https://example.com
+   > Recent breakthroughs in constitutional AI...
+```
+
+**Other Features:**
 - **JSONL Logs**: Machine-readable JSON Lines format for automated parsing and monitoring
-- **Session Logs**: Human-readable Markdown format with emojis, formatted timestamps, and organized metadata
 - **Automatic Rotation**: Keeps last 30 days of logs per type
-- **Event Types**: provider_started, provider_finished, synthesis_started, synthesis_finished, etc.
 - **All logs written to stderr** to avoid interfering with STDIO MCP transport
+
+See `EXAMPLE_SESSION_LOG.md` in the repository for a complete example session log.
 
 ### Debug Mode
 src/utils/debug.ts provides detailed debugging capabilities when `DEBUG=1`:

@@ -173,6 +173,20 @@ function formatCost(usd: number): string {
   return `$${usd.toFixed(4)}`;
 }
 
+function formatNumber(num: number): string {
+  return num.toLocaleString('en-US');
+}
+
+/**
+ * Truncate content with indicator
+ */
+function truncateContent(content: string, maxLength: number): string {
+  if (content.length <= maxLength) {
+    return content;
+  }
+  return content.substring(0, maxLength) + `\n\n... (truncated, ${content.length} total characters)`;
+}
+
 /**
  * Initialize logging system
  */
@@ -360,6 +374,142 @@ export function closeSessionLog(): void {
 `;
 
     appendFileSync(currentSessionFile, footer, 'utf-8');
+  } catch (error) {
+    // Silent fail
+  }
+}
+
+/**
+ * Log detailed provider request with full question text
+ * This writes directly to session log with full formatting
+ */
+export function logDetailedProviderRequest(
+  provider: Provider,
+  model: string,
+  questionId: string,
+  questionText: string
+): void {
+  if (!currentSessionFile) {
+    return;
+  }
+
+  try {
+    const timestamp = new Date();
+    const timeStr = timestamp.toLocaleTimeString('en-US', { hour12: false });
+
+    const entry = `
+### 🚀 [${timeStr}] ${provider.toUpperCase()} - Query Started
+
+**Provider:** ${provider}
+**Model:** \`${model}\`
+**Question ID:** ${questionId}
+
+**Question:**
+\`\`\`
+${questionText}
+\`\`\`
+
+---
+
+`;
+
+    appendFileSync(currentSessionFile, entry, 'utf-8');
+  } catch (error) {
+    // Silent fail
+  }
+}
+
+/**
+ * Log detailed provider response with full answer content
+ * This writes directly to session log with full formatting
+ */
+export function logDetailedProviderResponse(
+  provider: Provider,
+  model: string,
+  questionId: string,
+  result: {
+    content: string;
+    latencyMs: number;
+    usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+    citations?: Array<{ title: string; url?: string; snippet?: string }>;
+    error?: string;
+  },
+  costUSD?: number
+): void {
+  if (!currentSessionFile) {
+    return;
+  }
+
+  try {
+    const timestamp = new Date();
+    const timeStr = timestamp.toLocaleTimeString('en-US', { hour12: false });
+    const success = !result.error;
+    const emoji = success ? '✅' : '❌';
+    const statusText = success ? 'SUCCESS' : 'FAILED';
+
+    let entry = `
+### ${emoji} [${timeStr}] ${provider.toUpperCase()} - Query ${statusText}
+
+**Provider:** ${provider}
+**Model:** \`${model}\`
+**Question ID:** ${questionId}
+**Latency:** ${formatDuration(result.latencyMs)}`;
+
+    if (costUSD !== undefined) {
+      entry += `
+**Cost:** ${formatCost(costUSD)}`;
+    }
+
+    if (result.usage) {
+      entry += `
+**Tokens:** input=${formatNumber(result.usage.promptTokens)}, output=${formatNumber(result.usage.completionTokens)}, total=${formatNumber(result.usage.totalTokens)}`;
+    }
+
+    entry += '\n\n';
+
+    if (success && result.content) {
+      // Truncate very long responses for readability
+      const maxLength = 5000;
+      const displayContent = truncateContent(result.content, maxLength);
+
+      entry += `**Response:**
+\`\`\`
+${displayContent}
+\`\`\`
+
+`;
+    }
+
+    if (result.error) {
+      entry += `**Error Message:**
+\`\`\`
+${result.error}
+\`\`\`
+
+`;
+    }
+
+    if (result.citations && result.citations.length > 0) {
+      entry += `**Citations:** (${result.citations.length} sources)
+`;
+      result.citations.forEach((citation, index) => {
+        entry += `${index + 1}. **${citation.title}**`;
+        if (citation.url) {
+          entry += ` - ${citation.url}`;
+        }
+        if (citation.snippet) {
+          const snippetPreview = citation.snippet.substring(0, 150);
+          entry += `
+   > ${snippetPreview}${citation.snippet.length > 150 ? '...' : ''}`;
+        }
+        entry += '\n';
+      });
+      entry += '\n';
+    }
+
+    entry += '---\n\n';
+
+    appendFileSync(currentSessionFile, entry, 'utf-8');
   } catch (error) {
     // Silent fail
   }

@@ -21,7 +21,9 @@ import {
   notifySynthesisStarted,
   notifySynthesisFinished,
   notifySynthesisFailed,
-  notifyFileSaved
+  notifyFileSaved,
+  logDetailedProviderRequest,
+  logDetailedProviderResponse
 } from '../utils/log.js';
 import {
   logProviderRequest,
@@ -81,7 +83,10 @@ async function executeProviderQuery(
   // Notify start
   notifyProviderStarted(provider, selectedModel, question.id);
 
-  // Debug: Log request
+  // Log detailed request to session log (always enabled)
+  logDetailedProviderRequest(provider, selectedModel, question.id, question.text);
+
+  // Debug: Log request (only when DEBUG=1)
   logProviderRequest(provider, selectedModel, question.id, question.text);
 
   try {
@@ -98,7 +103,10 @@ async function executeProviderQuery(
       notifyProviderFailed(provider, question.id, result.error);
     }
 
-    // Debug: Log response
+    // Log detailed response to session log (always enabled)
+    logDetailedProviderResponse(provider, selectedModel, question.id, result, cost);
+
+    // Debug: Log response (only when DEBUG=1)
     logProviderResponse(provider, selectedModel, question.id, result, cost);
 
     return result;
@@ -117,7 +125,10 @@ async function executeProviderQuery(
       error: errorMsg
     };
 
-    // Debug: Log error response
+    // Log detailed error response to session log (always enabled)
+    logDetailedProviderResponse(provider, selectedModel, question.id, errorResult);
+
+    // Debug: Log error response (only when DEBUG=1)
     logProviderResponse(provider, selectedModel, question.id, errorResult);
 
     return errorResult;
