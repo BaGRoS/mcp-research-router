@@ -30,7 +30,7 @@ async function main() {
       }));
 
       closeDebugLog();
-      await stopServer();
+      await stopServer(); // stopServer calls closeSessionLog()
       process.exit(0);
     });
 
@@ -43,7 +43,7 @@ async function main() {
       }));
 
       closeDebugLog();
-      await stopServer();
+      await stopServer(); // stopServer calls closeSessionLog()
       process.exit(0);
     });
 

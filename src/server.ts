@@ -15,7 +15,7 @@ import { researchRun } from './tools/researchRun.js';
 import { researchStatus, researchStatusFormatted } from './tools/researchStatus.js';
 import { researchModels, researchModelsFormatted } from './tools/researchModels.js';
 import { researchSave } from './tools/researchSave.js';
-import { initLogging } from './utils/log.js';
+import { initLogging, closeSessionLog } from './utils/log.js';
 import researchRunSchema from './schema/research.run.json' with { type: 'json' };
 
 /**
@@ -207,8 +207,11 @@ export async function startServer(): Promise<void> {
  * Shutdown handler
  */
 export async function stopServer(): Promise<void> {
+  // Close session log before shutting down
+  closeSessionLog();
+
   await server.close();
-  
+
   console.error(JSON.stringify({
     level: 'info',
     event: 'server_stopped',
