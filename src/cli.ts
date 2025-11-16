@@ -7,16 +7,12 @@
  */
 
 import { startServer, stopServer } from './server.js';
-import { initDebugLogging, closeDebugLog } from './utils/debug.js';
 
 /**
  * Main entry point
  */
 async function main() {
   try {
-    // Initialize debug logging if DEBUG=1
-    initDebugLogging();
-
     // Start the MCP server
     await startServer();
 
@@ -29,8 +25,7 @@ async function main() {
         timestamp: new Date().toISOString()
       }));
 
-      closeDebugLog();
-      await stopServer(); // stopServer calls closeSessionLog()
+      await stopServer(); // stopServer closes all logs
       process.exit(0);
     });
 
@@ -42,8 +37,7 @@ async function main() {
         timestamp: new Date().toISOString()
       }));
 
-      closeDebugLog();
-      await stopServer(); // stopServer calls closeSessionLog()
+      await stopServer(); // stopServer closes all logs
       process.exit(0);
     });
 

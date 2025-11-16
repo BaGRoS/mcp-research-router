@@ -139,6 +139,12 @@ npm dist-tag add @bagros/mcp-research-router@0.3.0 latest
 
 ---
 
+## 🪲 Debug Logging
+
+Set `DEBUG=1` or `MCP_DEBUG=1` to capture full Markdown transcripts of every provider request/response in `logs/debug/debug-session-*.md`. These logs include prompts, responses, token usage, and a per-session summary. Use `DEBUG_LOG_DIR` if you want to store them outside of the repository root.
+
+---
+
 ## 🧾 License
 
 **MIT License**

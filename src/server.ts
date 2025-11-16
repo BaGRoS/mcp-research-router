@@ -16,6 +16,7 @@ import { researchStatus, researchStatusFormatted } from './tools/researchStatus.
 import { researchModels, researchModelsFormatted } from './tools/researchModels.js';
 import { researchSave } from './tools/researchSave.js';
 import { initLogging, closeSessionLog } from './utils/log.js';
+import { initDebugLogging, closeDebugLog } from './utils/debug.js';
 import researchRunSchema from './schema/research.run.json' with { type: 'json' };
 
 /**
@@ -187,6 +188,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
  */
 export async function startServer(): Promise<void> {
   // Initialize logging
+  initDebugLogging();
   initLogging();
 
   // Create STDIO transport
@@ -209,6 +211,7 @@ export async function startServer(): Promise<void> {
 export async function stopServer(): Promise<void> {
   // Close session log before shutting down
   closeSessionLog();
+  closeDebugLog();
 
   await server.close();
 
