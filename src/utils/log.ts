@@ -271,6 +271,61 @@ function writeSessionLog(entry: LogEntry): void {
   }
 }
 
+type SessionDetailSection = {
+  title?: string;
+  content: string;
+  language?: string;
+  format?: 'code' | 'text';
+};
+
+export interface SessionDetailOptions {
+  title: string;
+  emoji?: string;
+  timestamp?: Date;
+  metadata?: string[];
+  sections?: SessionDetailSection[];
+}
+
+/**
+ * Append a richly formatted block directly to the session Markdown log.
+ * Used for debug transcripts (provider prompts/responses, synthesis details).
+ */
+export function appendSessionDetail(options: SessionDetailOptions): void {
+  if (!currentSessionFile) {
+    return;
+  }
+
+  try {
+    const timestamp = options.timestamp ?? new Date();
+    const timeStr = timestamp.toLocaleTimeString('en-US', { hour12: false });
+    let entry = `### ${options.emoji ?? '📝'} [${timeStr}] ${options.title}\n\n`;
+
+    if (options.metadata?.length) {
+      entry += options.metadata.join('  •  ') + '\n\n';
+    }
+
+    if (options.sections?.length) {
+      for (const section of options.sections) {
+        if (section.title) {
+          entry += `**${section.title}:**\n`;
+        }
+
+        if (section.format === 'text') {
+          entry += `${section.content}\n\n`;
+        } else {
+          const lang = section.language ? section.language : '';
+          entry += `\`\`\`${lang}\n${section.content}\n\`\`\`\n\n`;
+        }
+      }
+    }
+
+    entry += '---\n\n';
+    appendFileSync(currentSessionFile, entry, 'utf-8');
+  } catch (error) {
+    // Do not crash if session detail logging fails
+  }
+}
+
 /**
  * Write log entry to stderr, JSONL file, and human-readable session log
  */

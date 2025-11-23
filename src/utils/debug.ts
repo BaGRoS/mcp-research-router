@@ -8,6 +8,7 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import type { Provider, ProviderResult, TokenUsage } from '../types.js';
+import { appendSessionDetail, type SessionDetailOptions } from './log.js';
 
 /**
  * Debug log directory path
@@ -321,6 +322,31 @@ ${prettifyJSON(requestPayload)}
 ` : ''}`;
 
   appendDebugLog(content);
+
+  appendSessionDetail({
+    title: `Request to ${provider.toUpperCase()} (${questionId})`,
+    emoji: '🛰️',
+    timestamp,
+    metadata: [
+      `**Provider:** ${provider}`,
+      `**Model:** ${model}`,
+      `**Question:** ${questionId}`
+    ],
+    sections: [
+      {
+        title: 'Prompt',
+        content: questionText,
+        language: 'text'
+      },
+      ...(requestPayload
+        ? [{
+            title: 'Request Payload',
+            content: prettifyJSON(requestPayload),
+            language: 'json'
+          }]
+        : [])
+    ]
+  });
 }
 
 /**
@@ -328,8 +354,8 @@ ${prettifyJSON(requestPayload)}
  */
 export function logProviderResponse(
   provider: Provider,
-  _model: string, // eslint-disable-line @typescript-eslint/no-unused-vars
-  _questionId: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+  model: string,
+  questionId: string,
   result: ProviderResult,
   costUSD?: number
 ): void {
@@ -406,6 +432,52 @@ ${result.citations.map((c, i) => `${i + 1}. ${c.title}${c.url ? ` - ${c.url}` : 
 `;
 
   appendDebugLog(content);
+
+  const sections: NonNullable<SessionDetailOptions['sections']> = [];
+  if (!result.error && result.content) {
+    sections.push({
+      title: 'Response',
+      content: result.content,
+      language: 'markdown'
+    });
+  }
+
+  if (result.error) {
+    sections.push({
+      title: 'Error',
+      content: result.error,
+      format: 'text'
+    });
+  }
+
+  if (result.citations && result.citations.length > 0) {
+    sections.push({
+      title: 'Citations',
+      content: result.citations
+        .map((citation, index) => `${index + 1}. ${citation.title}${citation.url ? ` - ${citation.url}` : ''}`)
+        .join('\n'),
+      format: 'text'
+    });
+  }
+
+  appendSessionDetail({
+    title: `${success ? 'Response' : 'Response Failed'} from ${provider.toUpperCase()} (${questionId})`,
+    emoji: success ? '✅' : '⚠️',
+    timestamp,
+    metadata: [
+      `**Provider:** ${provider}`,
+      `**Model:** ${model}`,
+      `**Question:** ${questionId}`,
+      `**Status:** ${statusText}`,
+      `**Latency:** ${formatDuration(result.latencyMs)}`,
+      ...(costUSD !== undefined ? [`**Cost:** ${formatCost(costUSD)}`] : []),
+      ...(result.usage
+        ? [`**Tokens:** in ${formatNumber(result.usage.promptTokens)}, out ${formatNumber(result.usage.completionTokens)}, total ${formatNumber(result.usage.totalTokens)}`]
+        : []),
+      ...(result.citations && result.citations.length > 0 ? [`**Citations:** ${result.citations.length}`] : [])
+    ],
+    sections
+  });
 }
 
 /**
@@ -438,6 +510,23 @@ ${synthesisPrompt.substring(0, TRUNCATE_SYNTHESIS_PROMPT)}${synthesisPrompt.leng
 `;
 
   appendDebugLog(content);
+
+  appendSessionDetail({
+    title: `Synthesis Request (${model})`,
+    emoji: '🧪',
+    timestamp,
+    metadata: [
+      `**Model:** ${model}`,
+      `**Sources:** ${sourceCount}`
+    ],
+    sections: synthesisPrompt
+      ? [{
+          title: 'Prompt',
+          content: synthesisPrompt,
+          language: 'markdown'
+        }]
+      : []
+  });
 }
 
 /**
@@ -498,6 +587,38 @@ ${metadataItems.join('\n')}
 `;
 
   appendDebugLog(content);
+
+  const sections: NonNullable<SessionDetailOptions['sections']> = [];
+  if (success && synthesizedContent) {
+    sections.push({
+      title: 'Synthesis Output',
+      content: synthesizedContent,
+      language: 'markdown'
+    });
+  }
+
+  if (error) {
+    sections.push({
+      title: 'Error',
+      content: error,
+      format: 'text'
+    });
+  }
+
+  appendSessionDetail({
+    title: `${success ? 'Synthesis Complete' : 'Synthesis Failed'} (${model})`,
+    emoji: success ? '🧬' : '⚠️',
+    timestamp,
+    metadata: [
+      `**Model:** ${model}`,
+      `**Latency:** ${formatDuration(latencyMs)}`,
+      ...(costUSD !== undefined ? [`**Cost:** ${formatCost(costUSD)}`] : []),
+      ...(usage
+        ? [`**Tokens:** input ${formatNumber(usage.promptTokens)}, output ${formatNumber(usage.completionTokens)}, total ${formatNumber(usage.totalTokens)}`]
+        : [])
+    ],
+    sections
+  });
 }
 
 /**
