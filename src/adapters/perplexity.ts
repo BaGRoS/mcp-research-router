@@ -106,7 +106,8 @@ class PerplexityAdapter implements ProviderAdapter {
         requestBody,
         {
           'Authorization': `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-Pplx-Integration': 'mcp-research-router'
         },
         {
           timeoutMs: 60000,
